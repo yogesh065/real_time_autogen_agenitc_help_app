@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import uuid
+import logging
 from datetime import datetime
 import time
 import threading
@@ -17,6 +18,10 @@ from fastapi.staticfiles import StaticFiles
 # AutoGen imports
 from autogen_realtime_medical import MedicalRealtimeAgentSystem
 from medical_database import MedicalProductDatabase
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Page configuration
 st.set_page_config(
@@ -83,13 +88,16 @@ if 'db' not in st.session_state:
     st.session_state.db = MedicalProductDatabase()
 
 if 'realtime_system' not in st.session_state:
-    # Get OpenAI API key
-    openai_api_key = os.getenv('OPENAI_API_KEY') or st.secrets.get('OPENAI_API_KEY')
-    if not openai_api_key:
-        st.error("⚠️ OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
+    # Get Groq API key
+    groq_api_key = os.getenv('GROQ_API_KEY') or st.secrets.get('GROQ_API_KEY')
+    if not groq_api_key:
+        st.error("⚠️ Groq API key not found. Please set GROQ_API_KEY environment variable.")
+        st.info("Get your API key from: https://console.groq.com/")
         st.stop()
     
-    st.session_state.realtime_system = MedicalRealtimeAgentSystem(openai_api_key)
+    logger.info("Initializing MedicalRealtimeAgentSystem with Groq API key")
+    st.session_state.realtime_system = MedicalRealtimeAgentSystem(groq_api_key)
+    logger.info("MedicalRealtimeAgentSystem initialized successfully")
 
 if 'conversation_history' not in st.session_state:
     st.session_state.conversation_history = []
@@ -98,8 +106,8 @@ if 'conversation_history' not in st.session_state:
 st.markdown("""
 <div class="main-header">
     <h1>🏥 Medical AI Assistant</h1>
-    <p>Medical Product Support powered by AutoGen</p>
-    <p>🤖 AI responds in real-time • 🏥 Professional medical guidance</p>
+    <p>Medical Product Support powered by AutoGen & Groq</p>
+    <p>🤖 AI responds in real-time • 🏥 Professional medical guidance • ⚡ Powered by Groq's Fast LLM</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -120,19 +128,26 @@ with col1:
     
     if st.button("🧠 Process with Medical Agents"):
         if user_query:
+            logger.info(f"User query received: '{user_query}'")
             with st.spinner("Medical agents processing your query..."):
                 # Simulate agent processing
                 if "search" in user_query.lower() or "find" in user_query.lower():
+                    logger.info("Processing as search query")
                     response = st.session_state.realtime_system.search_medical_products(user_query)
                 elif "dosage" in user_query.lower() or "dose" in user_query.lower():
+                    logger.info("Processing as dosage query")
                     # Extract product name (simplified)
                     product_name = user_query.split()[-1] if user_query.split() else "acetaminophen"
                     response = st.session_state.realtime_system.calculate_dosage(product_name, 30, 70)
                 elif "side effect" in user_query.lower() or "safety" in user_query.lower():
+                    logger.info("Processing as safety query")
                     product_name = user_query.split()[-1] if user_query.split() else "ibuprofen"
                     response = st.session_state.realtime_system.assess_safety_profile(product_name)
                 else:
+                    logger.info("Processing as general search query")
                     response = st.session_state.realtime_system.search_medical_products(user_query)
+                
+                logger.info(f"Generated response: {response[:100]}...")
                 
                 # Add to conversation history
                 st.session_state.conversation_history.append({
@@ -145,6 +160,9 @@ with col1:
                 # Display response
                 st.markdown(f'<div class="agent-response">{response}</div>', 
                            unsafe_allow_html=True)
+                logger.info("Response displayed to user")
+        else:
+            logger.warning("Empty user query received")
 
 with col2:
     st.header("⚡ Quick Actions")
@@ -164,6 +182,7 @@ with col2:
     
     for i, query in enumerate(sample_queries):
         if st.button(query, key=f"sample_{i}"):
+            logger.info(f"Sample query clicked: '{query}'")
             # Process sample query
             if "dosage" in query.lower():
                 product_name = query.split()[0]
@@ -176,6 +195,8 @@ with col2:
                 response = st.session_state.realtime_system.check_drug_interactions(meds)
             else:
                 response = st.session_state.realtime_system.search_medical_products(query)
+            
+            logger.info(f"Sample query response: {response[:100]}...")
             
             st.session_state.conversation_history.append({
                 'user': query,
@@ -198,7 +219,7 @@ with col2:
     - 🔄 Multi-agent coordination
     - 🎯 Specialized medical agents
     - 📊 Real-time processing
-    - 🤖 AI-powered responses
+    - ⚡ Powered by Groq's Fast LLM
     """)
 
 # Conversation History

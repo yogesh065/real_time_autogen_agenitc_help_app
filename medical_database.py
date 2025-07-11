@@ -1,6 +1,6 @@
 import sqlite3
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
 from datetime import datetime
 
@@ -78,17 +78,30 @@ class MedicalProductDatabase:
         conn.commit()
         conn.close()
     
-    def search_products_advanced(self, query: str, filters: Dict = None) -> List[Dict]:
+    def search_products_advanced(self, query: str, filters: Optional[Dict[str, Any]] = None) -> List[Dict]:
         """Advanced product search with filtering"""
         conn = sqlite3.connect(self.db_path)
         
+        # Split query into individual words for better matching
+        query_words = query.lower().split()
+        
+        # Build a more flexible search query
         base_query = '''
             SELECT * FROM medical_products 
-            WHERE (name LIKE ? OR generic_name LIKE ? OR brand_name LIKE ? 
-                   OR indications LIKE ? OR description LIKE ?)
+            WHERE (
+                LOWER(name) LIKE ? OR LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ? 
+                OR LOWER(indications) LIKE ? OR LOWER(description) LIKE ? OR LOWER(category) LIKE ?
+            )
         '''
         
-        params = [f'%{query}%'] * 5
+        # Use the original query for exact matches
+        params = [f'%{query}%'] * 6
+        
+        # Add individual word matches for better results
+        for word in query_words:
+            if len(word) > 2:  # Only search for words longer than 2 characters
+                base_query += ' OR (LOWER(name) LIKE ? OR LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ? OR LOWER(indications) LIKE ? OR LOWER(description) LIKE ? OR LOWER(category) LIKE ?)'
+                params.extend([f'%{word}%'] * 6)
         
         # Add filters
         if filters:

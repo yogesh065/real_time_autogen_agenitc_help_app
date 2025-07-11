@@ -18,11 +18,17 @@ speechrecognition>=3.10.0
 pyttsx3>=2.90
 pyaudio>=0.2.11
 
-# OpenAI and AI models
-openai>=1.0.0
+# Groq API and AI models
+groq>=0.4.0
 requests>=2.31.0
 
 # Utility libraries
 python-dotenv>=1.0.0
 typing-extensions>=4.8.0
-pydantic>=2.0.0 
+pydantic>=2.0.0
+
+# LangChain dependencies for SQL Agent
+langchain>=0.1.0
+langchain-community>=0.0.20
+langchain-groq>=0.0.1
+langchain-experimental>=0.0.50 

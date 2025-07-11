@@ -1,6 +1,7 @@
 import asyncio
 import json
 import uuid
+import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import time
@@ -15,31 +16,52 @@ import asyncio
 
 from medical_database import MedicalProductDatabase
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class MedicalRealtimeAgentSystem:
-    def __init__(self, openai_api_key: str, db_path: str = "medical_products.db"):
+    def __init__(self, groq_api_key: str, db_path: str = "medical_products.db"):
+        logger.info("Initializing MedicalRealtimeAgentSystem...")
         self.db = MedicalProductDatabase(db_path)
         self.session_id = str(uuid.uuid4())
-        self.openai_api_key = openai_api_key
+        self.groq_api_key = groq_api_key
+        
+        logger.info(f"Session ID: {self.session_id}")
+        logger.info(f"Groq API Key: {groq_api_key[:10]}...")
         
         # Initialize sample data
         try:
+            logger.info("Adding sample medical data...")
             self.db.add_sample_medical_data()
-        except:
-            pass  # Data might already exist
+            logger.info("Sample data added successfully")
+        except Exception as e:
+            logger.warning(f"Sample data might already exist: {e}")
         
-        # AutoGen configuration
+        # AutoGen configuration for Groq
+        logger.info("Setting up LLM configuration for Groq...")
         self.llm_config = {
-            "config_list": [{"model": "gpt-4", "api_key": openai_api_key}],
+            "config_list": [
+                {
+                    "model": "llama3.1-8b-8192",
+                    "api_key": groq_api_key,
+                    "base_url": "https://api.groq.com/openai/v1"
+                }
+            ],
             "temperature": 0.7,
             "max_tokens": 1500,
         }
         
+        logger.info(f"LLM Config: {self.llm_config}")
         self.setup_medical_agents()
+        logger.info("MedicalRealtimeAgentSystem initialization complete!")
     
     def setup_medical_agents(self):
         """Setup specialized medical agents"""
+        logger.info("Setting up medical agents...")
         
         # Medical Product Search Agent
+        logger.info("Creating MedicalProductSearcher agent...")
         self.product_search_agent = AssistantAgent(
             name="MedicalProductSearcher",
             system_message="""You are a medical product search specialist.
@@ -60,8 +82,10 @@ class MedicalRealtimeAgentSystem:
             Format responses for voice interaction - be clear and organized.""",
             llm_config=self.llm_config
         )
+        logger.info("MedicalProductSearcher agent created successfully")
         
         # Dosage Information Agent
+        logger.info("Creating DosageSpecialist agent...")
         self.dosage_agent = AssistantAgent(
             name="DosageSpecialist",
             system_message="""You are a dosage and administration specialist.
@@ -82,8 +106,10 @@ class MedicalRealtimeAgentSystem:
             Speak clearly about numbers and measurements.""",
             llm_config=self.llm_config
         )
+        logger.info("DosageSpecialist agent created successfully")
         
         # Safety and Interactions Agent
+        logger.info("Creating SafetySpecialist agent...")
         self.safety_agent = AssistantAgent(
             name="SafetySpecialist",
             system_message="""You are a medication safety and drug interaction specialist.
@@ -104,8 +130,10 @@ class MedicalRealtimeAgentSystem:
             Emphasize safety in all communications.""",
             llm_config=self.llm_config
         )
+        logger.info("SafetySpecialist agent created successfully")
         
         # Insurance and Coverage Agent
+        logger.info("Creating InsuranceCoverageSpecialist agent...")
         self.insurance_agent = AssistantAgent(
             name="InsuranceCoverageSpecialist",
             system_message="""You are an insurance and medication coverage specialist.
@@ -126,19 +154,28 @@ class MedicalRealtimeAgentSystem:
             Help users understand their coverage options clearly.""",
             llm_config=self.llm_config
         )
+        logger.info("InsuranceCoverageSpecialist agent created successfully")
         
         # User proxy agent
+        logger.info("Creating UserProxyAgent...")
         self.user_proxy = UserProxyAgent(
             name="User",
             human_input_mode="NEVER",
             max_consecutive_auto_reply=10,
-            llm_config=self.llm_config
+            llm_config=self.llm_config,
+            code_execution_config={"use_docker": False}
         )
+        logger.info("UserProxyAgent created successfully")
+        logger.info("All medical agents setup complete!")
     
     # Agent function implementations
     def search_medical_products(self, query: str, category: str = None, 
                               prescription_only: bool = None) -> str:
         """Search medical products with advanced filtering"""
+        logger.info(f"Searching medical products for query: '{query}'")
+        logger.info(f"Category filter: {category}")
+        logger.info(f"Prescription only filter: {prescription_only}")
+        
         try:
             filters = {}
             if category:
@@ -146,14 +183,18 @@ class MedicalRealtimeAgentSystem:
             if prescription_only is not None:
                 filters['prescription_required'] = prescription_only
             
+            logger.info(f"Applying filters: {filters}")
             products = self.db.search_products_advanced(query, filters)
+            logger.info(f"Found {len(products)} products")
             
             if not products:
+                logger.warning(f"No medical products found matching '{query}'")
                 return f"No medical products found matching '{query}'. Please try a different search term or ask me to search in a specific category."
             
             result = f"Found {len(products)} medical product(s) for '{query}':\n\n"
             
-            for product in products[:5]:  # Limit to top 5 for voice
+            for i, product in enumerate(products[:5]):  # Limit to top 5 for voice
+                logger.info(f"Processing product {i+1}: {product['name']}")
                 result += f"**{product['name']}** ({product['brand_name'] or 'Generic'})\n"
                 result += f"Category: {product['category']}\n"
                 result += f"Used for: {product['indications']}\n"
@@ -166,9 +207,11 @@ class MedicalRealtimeAgentSystem:
                 
                 result += "---\n"
             
+            logger.info(f"Generated response with {len(result)} characters")
             return result
             
         except Exception as e:
+            logger.error(f"Error searching medical products: {str(e)}")
             return f"Error searching medical products: {str(e)}"
     
     def get_product_details(self, product_name: str) -> str:
