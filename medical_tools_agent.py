@@ -41,7 +41,7 @@ class MedicalToolsAgentSystem:
                 }
             ],
             "temperature": 0.7,
-            "max_tokens": 1500,
+            "max_tokens": 10000,
         }
         
         logger.info(f"LLM Config: {self.llm_config}")
